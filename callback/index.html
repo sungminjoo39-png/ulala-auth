@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<!-- 보안: 이 페이지는 외부로 아무것도 보내지 않습니다.
+     default-src 'none' → 이미지·폰트·추적 스크립트 전부 차단
+     connect-src 'none' → fetch/XHR/웹소켓으로 코드를 보내는 것 자체가 불가능 -->
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; img-src 'none'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'">
+<!-- 보안: 다른 사이트로 넘어갈 때 인증코드가 담긴 주소가 새어나가지 않도록 -->
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>인증 코드 받기</title>
+<style>
+  :root { --bg:#fff; --fg:#1a1a1a; --muted:#666; --line:#e5e5e5; --card:#fafafa; --ok:#0a7d32; --warn:#9a3412; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg:#141414; --fg:#f0f0f0; --muted:#9a9a9a; --line:#2e2e2e; --card:#1e1e1e; --ok:#4ade80; --warn:#fdba74; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif; line-height:1.7; }
+  main { max-width:680px; margin:0 auto; padding:48px 16px 80px; }
+  h1 { font-size:1.35rem; margin:0 0 6px; letter-spacing:-.01em; }
+  .tick { font-size:.85rem; color:var(--muted); margin:0 0 24px; }
+  .box { border:1px solid var(--line); background:var(--card); border-radius:12px; padding:18px 20px; margin:0 0 14px; }
+  .label { font-size:.8rem; color:var(--muted); margin-bottom:6px; }
+  code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.9rem; word-break:break-all; }
+  #code { display:block; padding:12px 14px; background:var(--bg); border:1px solid var(--line); border-radius:8px; }
+  button { margin-top:12px; font:inherit; font-size:.9rem; padding:10px 16px; border:1px solid var(--line); background:var(--bg); color:var(--fg); border-radius:8px; cursor:pointer; }
+  button:hover { background:var(--card); }
+  .ok { color:var(--ok); }
+  .warn { color:var(--warn); }
+  ol { padding-left:1.3em; margin:.4em 0 0; }
+  li { margin:6px 0; }
+  .timer { font-variant-numeric:tabular-nums; font-weight:600; }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title">인증 코드를 확인하는 중…</h1>
+  <p class="tick" id="tick"></p>
+
+  <div class="box" id="result"></div>
+
+  <div class="box">
+    <div class="label">이 페이지가 지키는 것</div>
+    <ol>
+      <li>인증 코드를 <strong>어디에도 저장하지 않습니다.</strong> 서버도, 쿠키도, 브라우저 저장소도 쓰지 않습니다.</li>
+      <li>외부 전송이 <strong>기술적으로 차단</strong>돼 있습니다 (<code>connect-src 'none'</code>).</li>
+      <li>코드를 읽은 즉시 <strong>주소창에서 지웁니다</strong> — 방문 기록에 코드가 남지 않습니다.</li>
+      <li>Client Secret 과 Access Token 은 이 페이지가 <strong>아예 모릅니다.</strong> 내 컴퓨터에서만 다룹니다.</li>
+    </ol>
+  </div>
+</main>
+<script>
+(function () {
+  // 1) 주소에서 값을 읽어 메모리에만 담는다
+  var q = new URLSearchParams(location.search);
+  var code = q.get("code");
+  var state = q.get("state") || "";
+  var err = q.get("error");
+  var fullUrl = location.href;
+
+  // 2) 즉시 주소창을 깨끗하게 (방문기록·공유 사고 방지)
+  try {
+    if (code || err) history.replaceState(null, "", location.pathname);
+  } catch (e) {}
+
+  var title = document.getElementById("title");
+  var tick = document.getElementById("tick");
+  var box = document.getElementById("result");
+
+  function add(el) { box.appendChild(el); }
+  function div(cls, text) { var d = document.createElement("div"); d.className = cls; d.textContent = text; return d; }
+
+  if (code) {
+    title.textContent = "인증 코드를 받았습니다";
+    title.className = "ok";
+
+    // 3) 1분 카운트다운 — 카페24 인증 코드는 발급 후 1분이면 만료된다
+    var left = 60;
+    tick.innerHTML = '남은 시간 <span class="timer" id="t">60</span>초 — 1분이 지나면 다시 받아야 합니다';
+    var t = document.getElementById("t");
+    var iv = setInterval(function () {
+      left -= 1;
+      if (t) t.textContent = left > 0 ? left : 0;
+      if (left <= 0) {
+        clearInterval(iv);
+        tick.textContent = "1분이 지났습니다. 터미널에서 인증을 다시 실행해 주세요.";
+        tick.className = "tick warn";
+      }
+    }, 1000);
+
+    add(div("label", "아래 값을 복사해서, 이미 실행해 둔 터미널에 붙여넣으세요"));
+    var pre = document.createElement("code");
+    pre.id = "code";
+    pre.textContent = fullUrl;
+    add(pre);
+
+    var btn = document.createElement("button");
+    btn.textContent = "복사하기";
+    btn.onclick = function () {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(fullUrl).then(
+          function () { btn.textContent = "복사했습니다 ✓"; },
+          function () { btn.textContent = "복사 실패 — 위 값을 직접 선택해 복사하세요"; }
+        );
+      } else {
+        btn.textContent = "위 값을 직접 선택해 복사하세요";
+      }
+    };
+    add(btn);
+
+    if (state) add(div("label", "보안 확인값(state)도 함께 담겨 있습니다. 터미널이 자동으로 검사합니다."));
+  } else if (err) {
+    title.textContent = "승인되지 않았습니다";
+    title.className = "warn";
+    var e = document.createElement("code");
+    e.textContent = err + " " + (q.get("error_description") || "");
+    add(e);
+    add(div("label", "scope(권한)나 Redirect URI 가 앱 설정과 다를 때 주로 납니다. 터미널의 안내를 확인하세요."));
+  } else {
+    title.textContent = "인증 코드가 없습니다";
+    title.className = "warn";
+    add(div("label", "터미널에서 인증을 실행해 나온 주소로 접속한 뒤 [승인]을 눌러야 이 화면에 코드가 들어옵니다."));
+  }
+})();
+</script>
+</body>
+</html>
