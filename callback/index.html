@@ -73,6 +73,30 @@
   function add(el) { box.appendChild(el); }
   function div(cls, text) { var d = document.createElement("div"); d.className = cls; d.textContent = text; return d; }
 
+  // 2-1) 자동 전달 — state 가 "L<포트>x..." 형태면 내 컴퓨터의 수신기로 보낸다.
+  //      HTTPS 페이지에서 http://127.0.0.1 로 가는 것은 '화면 이동'이라 막히지 않는다.
+  //      (차단되는 것은 이미지·스크립트 같은 '부분 요청'이고, 화면 이동은 해당 없음)
+  //      코드는 내 컴퓨터 안으로만 가며, 다른 곳으로는 보내지 않는다.
+  var 자동 = state.match(/^L(\d{4,5})x/);
+  if (code && 자동) {
+    var 포트 = 자동[1];
+    title.textContent = "인증 코드를 받았습니다";
+    title.className = "ok";
+    tick.textContent = "내 컴퓨터로 자동 전달하는 중입니다… 잠시만 기다려 주세요.";
+    add(div("label", "자동으로 넘어가지 않으면 아래 버튼을 눌러 주세요."));
+
+    var 보낼곳 = "http://127.0.0.1:" + 포트 + "/?" + "code=" +
+                encodeURIComponent(code) + "&state=" + encodeURIComponent(state);
+
+    var 수동 = document.createElement("button");
+    수동.textContent = "인증 마무리하기";
+    수동.onclick = function () { location.replace(보낼곳); };
+    add(수동);
+
+    setTimeout(function () { location.replace(보낼곳); }, 900);
+    return;
+  }
+
   if (code) {
     title.textContent = "인증 코드를 받았습니다";
     title.className = "ok";
